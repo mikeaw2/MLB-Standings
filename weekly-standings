@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MLB Weekly Standings</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h1 { text-align: center; }
+    .standings, .weekly-performance { margin-top: 40px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background-color: #f4f4f4; }
+  </style>
+</head>
+<body>
+  <h1>MLB Standings and Weekly Performance</h1>
+
+  <div class="standings">
+    <h2>Current Standings</h2>
+    <div id="standings-table"></div>
+  </div>
+
+  <div class="weekly-performance">
+    <h2>Weekly Performance (Saturday to Friday)</h2>
+    <div id="weekly-table"></div>
+  </div>
+
+  <script>
+    const standingsUrl = 'https://statsapi.mlb.com/api/v1/standings?leagueId=103,104&season=2025';
+    const scheduleUrl = 'https://statsapi.mlb.com/api/v1/schedule?sportId=1';
+
+    // Function to fetch and display current standings
+    async function fetchStandings() {
+      try {
+        const response = await fetch(standingsUrl);
+        const data = await response.json();
+        const records = data.records;
+        let html = '';
+
+        records.forEach(record => {
+          html += `<h3>${record.division.name}</h3>`;
+          html += `<table>
+                    <tr>
+                      <th>Team</th>
+                      <th>Wins</th>
+                      <th>Losses</th>
+                      <th>Win%</th>
+                    </tr>`;
+          record.teamRecords.forEach(team => {
+            html += `<tr>
+                      <td>${team.team.name}</td>
+                      <td>${team.wins}</td>
+                      <td>${team.losses}</td>
+                      <td>${team.winningPercentage}</td>
+                    </tr>`;
+          });
+          html += `</table>`;
+        });
+
+        document.getElementById('standings-table').innerHTML = html;
+      } catch (error) {
+        console.error('Error fetching standings:', error);
+      }
+    }
+
+    // Function to fetch and display weekly performance
+    async function fetchWeeklyPerformance() {
+      try {
+        // Calculate last Saturday and Friday dates
+        const today = new Date();
+        const dayOfWeek = today.getDay();
+        const lastSaturday = new Date(today);
+        lastSaturday.setDate(today.getDate() - ((dayOfWeek + 1) % 7));
+        const lastFriday = new Date(lastSaturday);
+        lastFriday.setDate(lastSaturday.getDate() + 6);
+
+        const startDate = lastSaturday.toISOString().split('T')[0];
+        const endDate = lastFriday.toISOString().split('T')[0];
+
+        const response = await fetch(`${scheduleUrl}&startDate=${startDate}&endDate=${endDate}`);
+        const data = await response.json();
+        const dates = data.dates;
+
+        const teamStats = {};
+
+        dates.forEach(date => {
+          date.games.forEach(game => {
+            const homeTeam = game.teams.home.team.name;
+            const awayTeam = game.teams.away.team.name;
+            const homeScore = game.teams.home.score;
+            const awayScore = game.teams.away.score;
+
+            // Initialize team stats if not present
+            if (!teamStats[homeTeam]) teamStats[homeTeam] = { wins: 0, losses: 0 };
+            if (!teamStats[awayTeam]) teamStats[awayTeam] = { wins: 0, losses: 0 };
+
+            if (homeScore > awayScore) {
+              teamStats[homeTeam].wins += 1;
+              teamStats[awayTeam].losses += 1;
+            } else {
+              teamStats[awayTeam].wins += 1;
+              teamStats[homeTeam].losses += 1;
+            }
+          });
+        });
+
+        // Generate HTML table
+        let html = `<table>
+                      <tr>
+                        <th>Team</th>
+                        <th>Wins</th>
+                        <th>Losses</th>
+                      </tr>`;
+        for (const team in teamStats) {
+          html += `<tr>
+                    <td>${team}</td>
+                    <td>${teamStats[team].wins}</td>
+                    <td>${teamStats[team].losses}</td>
+                  </tr>`;
+        }
+        html += `</table>`;
+
+        document.getElementById('weekly-table').innerHTML = html;
+      } catch (error) {
+        console.error('Error fetching weekly performance:', error);
+      }
+    }
+
+    // Fetch data on page load
+    fetchStandings();
+    fetchWeeklyPerformance();
+  </script>
+</body>
+</html>
